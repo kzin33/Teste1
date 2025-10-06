@@ -1,0 +1,242 @@
+--==============================
+-- HITBOX + ESP PROFISSIONAL - by phz
+-- Hitbox 🥀 e ESP ☠️ separado, vida estilo barra de caracteres
+-- Uso educativo e servidor privado
+--==============================
+
+-- Bibliotecas
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+
+--==============================
+-- CONFIGURAÇÕES
+--==============================
+
+-- Hitbox
+local hitboxAtiva = false
+local hitboxTamanho = 5
+local hitboxColor = Color3.fromRGB(0, 120, 255)
+local hitboxTransparency = 0.6
+local hitboxParts = {}
+
+-- ESP
+local espAtivo = false
+local espParts = {}
+local espFrame = nil -- Painel da ESP
+
+--==============================
+-- FUNÇÕES HITBOX
+--==============================
+
+local function aplicarHitbox(player)
+    if player == LocalPlayer then return end
+    local char = player.Character
+    if not char then return end
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    local rootPart = char:FindFirstChild("HumanoidRootPart")
+    if humanoid and humanoid.Health > 0 and rootPart then
+        if not hitboxParts[player] then
+            local box = Instance.new("BoxHandleAdornment")
+            box.Adornee = rootPart
+            box.Color3 = hitboxColor
+            box.Size = Vector3.new(hitboxTamanho, hitboxTamanho, hitboxTamanho)
+            box.Transparency = hitboxTransparency
+            box.AlwaysOnTop = true
+            box.ZIndex = 5
+            box.Parent = game.CoreGui
+            hitboxParts[player] = box
+
+            humanoid.Died:Connect(function()
+                if hitboxParts[player] then
+                    hitboxParts[player]:Destroy()
+                    hitboxParts[player] = nil
+                end
+            end)
+        else
+            hitboxParts[player].Size = Vector3.new(hitboxTamanho, hitboxTamanho, hitboxTamanho)
+        end
+    else
+        if hitboxParts[player] then
+            hitboxParts[player]:Destroy()
+            hitboxParts[player] = nil
+        end
+    end
+end
+
+local function atualizarHitboxes()
+    for _, player in ipairs(Players:GetPlayers()) do
+        if hitboxAtiva then
+            aplicarHitbox(player)
+        else
+            if hitboxParts[player] then
+                hitboxParts[player]:Destroy()
+                hitboxParts[player] = nil
+            end
+        end
+    end
+end
+
+--==============================
+-- FUNÇÕES ESP
+--==============================
+
+-- Cria painel HUD da ESP se não existir
+local function criarPainelESP()
+    if not espFrame then
+        espFrame = Instance.new("ScreenGui")
+        espFrame.Name = "ESP_Painel"
+        espFrame.ResetOnSpawn = false
+        espFrame.Parent = game.CoreGui
+
+        local frame = Instance.new("Frame")
+        frame.Size = UDim2.new(0, 200, 0, 300)
+        frame.Position = UDim2.new(1, -210, 0, 10)
+        frame.BackgroundTransparency = 0.4
+        frame.BackgroundColor3 = Color3.fromRGB(0,0,0)
+        frame.BorderSizePixel = 0
+        frame.Parent = espFrame
+        espFrame.Frame = frame
+    end
+end
+
+-- Atualiza a ESP textual
+local function atualizarESP()
+    if not espAtivo then
+        if espFrame then espFrame:Destroy(); espFrame = nil end
+        espParts = {}
+        return
+    end
+
+    criarPainelESP()
+    local frame = espFrame.Frame
+
+    -- Limpa antigos
+    for _, obj in pairs(frame:GetChildren()) do
+        obj:Destroy()
+    end
+
+    local y = 0
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChildOfClass("Humanoid") then
+            local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+            local vida = math.clamp(humanoid.Health, 0, humanoid.MaxHealth)
+            local maxVida = humanoid.MaxHealth
+
+            -- Cria barra textual simples
+            local barraQtd = math.floor((vida/maxVida)*10)
+            local barra = string.rep("█", barraQtd) .. string.rep("░", 10 - barraQtd)
+
+            -- Label
+            local label = Instance.new("TextLabel")
+            label.Size = UDim2.new(1, -10, 0, 20)
+            label.Position = UDim2.new(0,5,0, y)
+            label.BackgroundTransparency = 1
+            label.TextColor3 = Color3.fromRGB(0,255,0)
+            label.TextScaled = true
+            label.Font = Enum.Font.SourceSansBold
+            label.Text = player.Name .. " | " .. barra .. " ("..math.floor(vida).."/"..math.floor(maxVida)..")"
+            label.TextXAlignment = Enum.TextXAlignment.Left
+            label.Parent = frame
+
+            espParts[player] = label
+            y = y + 22
+        end
+    end
+end
+
+--==============================
+-- INTERFACE RAYFIELD
+--==============================
+
+local Window = Rayfield:CreateWindow({
+    Name = "✨ Hitbox 🥀 + ESP ☠️ by phz",
+    LoadingTitle = "Carregando...",
+    LoadingSubtitle = "by=phz",
+    Theme = "Dark",
+    Enabled = true
+})
+
+local MainTab = Window:CreateTab("Configurações", 4483362458)
+MainTab:CreateSection("Controle Separado", "left")
+
+-- Slider da Hitbox
+MainTab:CreateSlider({
+    Name = "Tamanho da Hitbox 🥀",
+    Range = {5,50},
+    Increment = 1,
+    Suffix = " studs",
+    CurrentValue = hitboxTamanho,
+    Flag = "hitboxSize",
+    Callback = function(value)
+        hitboxTamanho = value
+        atualizarHitboxes()
+    end
+})
+
+-- Botão Hitbox
+MainTab:CreateButton({
+    Name = "Ligar/Desligar Hitbox 🥀",
+    Flag = "toggleHitbox",
+    Callback = function()
+        hitboxAtiva = not hitboxAtiva
+        atualizarHitboxes()
+        Rayfield:Notify({
+            Title = hitboxAtiva and "✨ Hitbox 🥀 Ativada" or "❌ Hitbox 🥀 Desativada",
+            Content = hitboxAtiva and "Deus é o rei" or "Hitbox desligada",
+            Duration = 3
+        })
+    end
+})
+
+-- Botão ESP
+MainTab:CreateButton({
+    Name = "Ligar/Desligar ESP ☠️",
+    Flag = "toggleESP",
+    Callback = function()
+        espAtivo = not espAtivo
+        atualizarESP()
+        Rayfield:Notify({
+            Title = espAtivo and "✨ ESP ☠️ Ativado" or "❌ ESP ☠️ Desativado",
+            Content = espAtivo and "Deus é o rei" or "ESP desligado",
+            Duration = 3
+        })
+    end
+})
+
+--==============================
+-- EVENTOS
+--==============================
+
+RunService.RenderStepped:Connect(function()
+    atualizarHitboxes()
+    atualizarESP()
+end)
+
+Players.PlayerRemoving:Connect(function(player)
+    if hitboxParts[player] then
+        hitboxParts[player]:Destroy()
+        hitboxParts[player] = nil
+    end
+    if espParts[player] then
+        espParts[player]:Destroy()
+        espParts[player] = nil
+    end
+end)
+
+local function conectarPersonagem(player)
+    player.CharacterAdded:Connect(function()
+        if hitboxAtiva then
+            aplicarHitbox(player)
+        end
+        if espAtivo then
+            atualizarESP()
+        end
+    end)
+end
+
+Players.PlayerAdded:Connect(conectarPersonagem)
+for _, player in ipairs(Players:GetPlayers()) do
+    conectarPersonagem(player)
+end
